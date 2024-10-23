@@ -584,6 +584,13 @@ static UICompositeViewDescription *compositeDescription = nil;
 #pragma mark - UI update
 
 - (void)changeView:(UIView *)view back:(BOOL)back animation:(BOOL)animation {
+    
+    // 4Freedom Changes | BEGIN
+    if (view == _welcomeView) {
+        view = _loginView;
+        [self resetLiblinphone: TRUE];
+    }
+    // 4Freedom Changes | END
 
 	static BOOL placement_done = NO; // indicates if the button placement has been done in the assistant choice view
 
@@ -1654,71 +1661,119 @@ UIColor *previousColor = (UIColor*)[sender backgroundColor]; \
 }
 
 - (IBAction)onLoginClick:(id)sender {
-	ONCLICKBUTTON(sender, 100, {
-		_waitView.hidden = NO;
-		NSString *domain = [self findTextField:ViewElement_Domain].text;
-		NSString *username = [self findTextField:ViewElement_Username].text;
-		NSString *displayName = [self findTextField:ViewElement_DisplayName].text;
-		NSString *pwd = [self findTextField:ViewElement_Password].text;
-		LinphoneAccountParams *accountParams =  linphone_core_create_account_params(LC);
-		LinphoneAddress *addr = linphone_address_new(NULL);
-		LinphoneAddress *tmpAddr = linphone_address_new([NSString stringWithFormat:@"sip:%@",domain].UTF8String);
-		if (tmpAddr == nil) {
-			[self displayAssistantConfigurationError];
-			return;
-		}
-		
-		linphone_address_set_username(addr, username.UTF8String);
-		linphone_address_set_port(addr, linphone_address_get_port(tmpAddr));
-		linphone_address_set_domain(addr, linphone_address_get_domain(tmpAddr));
-		if (displayName && ![displayName isEqualToString:@""]) {
-			linphone_address_set_display_name(addr, displayName.UTF8String);
-		}
-		
-		linphone_account_params_set_identity_address(accountParams, addr);
-		// set transport
-		UISegmentedControl *transports = (UISegmentedControl *)[self findView:ViewElement_Transport
-																	   inView:self.contentView
-																	   ofType:UISegmentedControl.class];
-		if (transports) {
-			NSString *type = [transports titleForSegmentAtIndex:[transports selectedSegmentIndex]];
-			LinphoneAddress *transportAddr = linphone_address_new([NSString stringWithFormat:@"sip:%s;transport=%s", domain.UTF8String, type.lowercaseString.UTF8String].UTF8String);
-			linphone_account_params_set_routes_addresses(accountParams, bctbx_list_new(transportAddr));
-			linphone_account_params_set_server_addr(accountParams, [NSString stringWithFormat:@"%s;transport=%s", domain.UTF8String, type.lowercaseString.UTF8String].UTF8String);
-			
-			linphone_address_unref(transportAddr);
-		}
-		linphone_account_params_set_publish_enabled(accountParams, FALSE);
-		linphone_account_params_set_register_enabled(accountParams, TRUE);
-		
-		LinphoneAuthInfo *info =
-			linphone_auth_info_new(linphone_address_get_username(addr), // username
-								   NULL,								// user id
-								   pwd.UTF8String,						// passwd
-								   NULL,								// ha1
-								   linphone_address_get_domain(addr),   // realm - assumed to be domain
-								   linphone_address_get_domain(addr)	// domain
-								   );
-		linphone_core_add_auth_info(LC, info);
-		linphone_address_unref(addr);
-		linphone_address_unref(tmpAddr);
-		
-		LinphoneAccount *account = linphone_core_create_account(LC, accountParams);
-		linphone_account_params_unref(accountParams);
-		if (account) {
-			if (linphone_core_add_account(LC, account) != -1) {
-				linphone_core_set_default_account(LC, account);
-				// reload address book to prepend proxy config domain to contacts' phone number
-				// todo: STOP doing that!
-				[[LinphoneManager.instance fastAddressBook] fetchContactsInBackGroundThread];
-                [PhoneMainView.instance changeCurrentView:DialerView.compositeViewDescription];
-			} else {
-			  [self displayAssistantConfigurationError];
-			}
-		} else {
-		  [self displayAssistantConfigurationError];
-		}
-	});
+    [self _loginVia4Freedom];
+//    ONCLICKBUTTON(sender, 100, ^{
+//        [self _loginVia4Freedom];
+//    });
+}
+
+- (void) _loginVia4Freedom {
+        _waitView.hidden = NO;
+        NSString *username = [self findTextField:ViewElement_Username].text;
+        NSString *pwd = [self findTextField:ViewElement_Password].text;
+
+        // 4Freedom Changes | BEGIN
+        [LinphoneManager loginTo4Freedom:username password:pwd completion:^(NSDictionary<NSString *, NSString *> * _Nullable loginResult, NSError * _Nullable error) {
+            if (error) {
+                [self displayAssistantConfigurationError];
+                return;
+            }
+
+            // Provision if needed
+            NSString *provisioning_uri = loginResult[@"provisioning_uri"];
+            if (provisioning_uri != nil && provisioning_uri.length > 0 && ![provisioning_uri isEqualToString:@"null"]) {
+                linphone_core_set_provisioning_uri(LC, [self addSchemeToProvisiionninUriIMissing:provisioning_uri].UTF8String);
+                [self resetLiblinphone:TRUE];
+            }
+
+            // Extract SIP login details
+            NSString *username = loginResult[@"username"];
+            NSString *pwd = loginResult[@"password"];
+            NSString *domain = loginResult[@"domain"];
+            NSString *displayName = loginResult[@"display_name"];
+
+            LinphoneAccountParams *accountParams = linphone_core_create_account_params(LC);
+            LinphoneAddress *addr = linphone_address_new(NULL);
+            LinphoneAddress *tmpAddr = linphone_address_new([NSString stringWithFormat:@"sip:%@",domain].UTF8String);
+
+            if (tmpAddr
+ == nil) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [self displayAssistantConfigurationError];
+                });
+                return;
+            }
+
+            linphone_address_set_username(addr, username.UTF8String);
+            linphone_address_set_port(addr, linphone_address_get_port(tmpAddr));
+
+            linphone_address_set_domain(addr, linphone_address_get_domain(tmpAddr));
+            if (displayName && ![displayName isEqualToString:@""]) {
+                linphone_address_set_display_name(addr, displayName.UTF8String);
+            }
+
+            linphone_account_params_set_identity_address(accountParams,
+ addr);
+
+            // 4Freedom Changes | BEGIN
+            if (loginResult != nil) {
+                if (loginResult[@"country_prefix"] != nil) {
+                    NSString *countryPrefix = loginResult[@"country_prefix"];
+                    linphone_account_params_set_international_prefix(accountParams, countryPrefix.UTF8String);
+                }
+                linphone_account_params_set_use_international_prefix_for_calls_and_chats(accountParams, true);
+            }
+            // 4Freedom Changes | END
+
+            dispatch_sync(dispatch_get_main_queue(),  ^{
+                // set transport
+                UISegmentedControl *transports = (UISegmentedControl *)[self findView:ViewElement_Transport
+                                                                               inView:self.contentView
+                                                                               ofType:UISegmentedControl.class];
+                if (transports) {
+                    NSString *type = [transports titleForSegmentAtIndex:[transports selectedSegmentIndex]];
+
+                    LinphoneAddress *transportAddr = linphone_address_new([NSString stringWithFormat:@"sip:%s;transport=%s", domain.UTF8String, type.lowercaseString.UTF8String].UTF8String);
+                    linphone_account_params_set_routes_addresses(accountParams, bctbx_list_new(transportAddr));
+                    linphone_account_params_set_server_addr(accountParams, [NSString stringWithFormat:@"%s;transport=%s", domain.UTF8String, type.lowercaseString.UTF8String].UTF8String);
+
+                    linphone_address_unref(transportAddr);
+                }
+                linphone_account_params_set_publish_enabled(accountParams, FALSE);
+                linphone_account_params_set_register_enabled(accountParams, TRUE);
+
+                LinphoneAuthInfo *info =
+                    linphone_auth_info_new(linphone_address_get_username(addr), // username
+                                            NULL,                                // user id
+                                            pwd.UTF8String,                     // passwd
+                                            NULL,                                // ha1
+                                            linphone_address_get_domain(addr),   // realm - assumed to be domain
+                                            linphone_address_get_domain(addr)    // domain
+                                            );
+                linphone_core_add_auth_info(LC, info);
+                
+                linphone_address_unref(addr);
+                linphone_address_unref(tmpAddr);
+
+                LinphoneAccount *account = linphone_core_create_account(LC, accountParams);
+                linphone_account_params_unref(accountParams);
+                if (account) {
+                    if (linphone_core_add_account(LC, account) != -1) {
+                        linphone_core_set_default_account(LC, account);
+                        // reload address book to prepend proxy config domain to contacts' phone number
+                        // todo: STOP doing that!
+                        [[LinphoneManager.instance fastAddressBook] fetchContactsInBackGroundThread];
+
+                        [PhoneMainView.instance changeCurrentView:DialerView.compositeViewDescription];
+                    } else {
+                        [self displayAssistantConfigurationError];
+                    }
+                } else {
+                    [self displayAssistantConfigurationError];
+                }
+            });
+        }]; // End of loginTo4Freedom completion block
+        // 4Freedom Changes | END
 }
 
 - (IBAction)onRemoteProvisioningLoginClick:(id)sender {

@@ -85,7 +85,7 @@ NSString *const kLinphoneMagicSearchMoreAvailable = @"LinphoneMagicSearchMoreAva
 NSString *const kDisplayModeChanged = @"DisplayModeChanged";
 NSString *const kLinphoneAccountCreationAuthenticationTokenReceived = @"LinphoneAccountCreationAuthenticationTokenReceived";
 
-NSString *const kLinphoneMsgNotificationAppGroupId = @"group.org.linphone.phone.msgNotification";
+NSString *const kLinphoneMsgNotificationAppGroupId = @"group.com.fourfreedommobile.msgNotification";
 
 const int kLinphoneAudioVbrCodecDefaultBitrate = 36; /*you can override this from linphonerc or linphonerc-factory*/
 
@@ -2415,5 +2415,99 @@ void linphone_iphone_conference_state_changed(LinphoneCore *lc, LinphoneConferen
 	
 	[defaults setObject:chatroomsPushStatus forKey:@"chatroomsPushStatus"];
 }
+
+
+// 4Freedom Changes | BEGIN
+#define BASE_URL_4FREEDOM "https://siptst.4freedommobile.com/wrapper/"
+
++ (NSDictionary<NSString*, NSString*>*) loginTo4Freedom: (NSString *) phone password: (NSString *) password completion:(void (^)(NSDictionary<NSString *, NSString *> * _Nullable, NSError * _Nullable))completion {
+    NSMutableDictionary *jsonBody = [[NSMutableDictionary alloc] init];
+    [jsonBody setObject:[phone stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] forKey:@"phone"];
+    [jsonBody setObject:[password stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] forKey:@"password"];
+
+    NSError *error;
+    NSData *bodyData = [NSJSONSerialization dataWithJSONObject:jsonBody options:0 error:&error];
+    
+    NSURL *url = [NSURL URLWithString:[NSString stringWithFormat:@"%sapi/auth/", BASE_URL_4FREEDOM]];
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+    [request setHTTPMethod:@"POST"];
+    [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+    [request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
+    [request setHTTPBody:bodyData];
+
+    NSURLSession *session = [NSURLSession sharedSession];
+    NSURLSessionDataTask *dataTask = [session dataTaskWithRequest:request completionHandler:^(NSData * _Nullable responseData, NSURLResponse * _Nullable response, NSError * _Nullable error) {
+        if (error) {
+            NSLog(@"OkHttp Error: %@", error.localizedDescription);
+            if (completion) {
+                completion(nil, error);
+            }
+        } else {
+            NSString *responseBody = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
+            if (responseBody) {
+                NSDictionary *json = [NSJSONSerialization JSONObjectWithData:responseData options:0 error:&error];
+                if (!error) {
+                    NSMutableDictionary *resultMap = [[NSMutableDictionary alloc] init];
+                    for (NSString *key in json) {
+                        [resultMap setObject:[json objectForKey:key] forKey:key];
+                    }
+                    if (completion) {
+                        completion(resultMap, nil);
+                    }
+                } else {
+                    if (completion) {
+                        completion(nil, error);
+                    }
+                }
+            }
+        }
+    }];
+    [dataTask resume]; 
+    return nil;
+}
+
++ (NSDictionary<NSString *, NSString *> *)getSipAddressForPhoneNumber:(NSString *)phone mode:(NSString *)mode {
+    NSMutableDictionary *jsonBody = [[NSMutableDictionary alloc] init];
+    [jsonBody setObject:[phone stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] forKey:@"phone"];
+    [jsonBody setObject:[mode stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] forKey:@"mode"];
+
+    NSData *bodyData = [[jsonBody description] dataUsingEncoding:NSUTF8StringEncoding];
+    NSURL *url = [NSURL URLWithString:[NSString stringWithFormat:@"%sapi/getSipAddressForPhoneNumber/", BASE_URL_4FREEDOM]];
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+    [request setHTTPMethod:@"POST"];
+    [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+    [request setHTTPBody:bodyData];
+    NSError *error;
+    NSURLResponse *response;
+    NSData *responseData = [NSURLConnection sendSynchronousRequest:request returningResponse:&response error:&error];
+    if (!error) {
+        NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+        if (httpResponse.statusCode == 200) {
+            NSString *responseBody = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
+            if (responseBody) {
+                NSDictionary *json = [NSJSONSerialization JSONObjectWithData:responseData options:0 error:&error];
+                if (!error) {
+                    if ([json objectForKey:@"errors"] != nil) {
+                        return nil;
+                    } else {
+                        NSMutableDictionary *resultMap = [[NSMutableDictionary alloc] init];
+                        for (NSString *key in json) {
+                            [resultMap setObject:[json objectForKey:key] forKey:key];
+                        }
+                        return resultMap;
+                    }
+                }
+            }
+        } else {
+            NSLog(@"HTTP Error: %ld", (long)httpResponse.statusCode);
+        }
+    } else {
+        NSLog(@"HTTP Error: %@", error.localizedDescription);
+    }
+
+    return nil;
+}
+// 4Freedom Changes | END
+
 
 @end

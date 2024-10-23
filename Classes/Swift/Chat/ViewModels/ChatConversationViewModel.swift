@@ -26,7 +26,7 @@ class ChatConversationViewModel {
 	
 	static let sharedModel = ChatConversationViewModel()
 	
-	let APP_GROUP_ID = "group.belledonne-communications.linphone.widget"
+	let APP_GROUP_ID = "group.com.fourfreedommobile.linphone.widget"
 
 	var chatRoom: ChatRoom? = nil
 	var chatRoomDelegate: ChatRoomDelegate? = nil

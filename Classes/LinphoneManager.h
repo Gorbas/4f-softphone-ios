@@ -200,6 +200,11 @@ typedef struct _LinphoneManagerSounds {
 + (BOOL) getChatroomPushEnabled:(LinphoneChatRoom *)chatroom;
 + (void) setChatroomPushEnabled:(LinphoneChatRoom *)chatroom withPushEnabled:(BOOL)enabled;
 
+// 4Freedom Changes | BEGIN
++ (NSDictionary<NSString*, NSString*>*) loginTo4Freedom: (NSString *) phone password: (NSString *) password completion: (void (^)(NSDictionary<NSString *, NSString *> * _Nullable, NSError * _Nullable))completion;
++ (NSDictionary<NSString*, NSString*>*) getSipAddressForPhoneNumber:(NSString *) phone mode: (NSString *) mode;
+// 4Freedom Changes | END
+
 @property (readonly) BOOL isTesting;
 @property(readonly, strong) FastAddressBook *fastAddressBook;
 @property (readonly) NetworkType network;
