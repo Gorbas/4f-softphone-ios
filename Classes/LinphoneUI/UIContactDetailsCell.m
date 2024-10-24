@@ -157,17 +157,11 @@
 }
 
 - (IBAction)onChatClick:(id)event {
-	LinphoneAddress *addr = [LinphoneUtils normalizeSipOrPhoneAddress:_addressLabel.text];
-	[LinphoneManager.instance lpConfigSetBool:TRUE forKey:@"create_chat"];
-	[PhoneMainView.instance getOrCreateOneToOneChatRoom:addr waitView:_waitView isEncrypted:FALSE];
-	linphone_address_unref(addr);
+    [self chatEncrypted: FALSE];
 }
 
 - (IBAction)onEncrptedChatClick:(id)sender {
-    LinphoneAddress *addr = [LinphoneUtils normalizeSipOrPhoneAddress:_addressLabel.text];
-	[LinphoneManager.instance lpConfigSetBool:TRUE forKey:@"create_chat"];
-    [PhoneMainView.instance getOrCreateOneToOneChatRoom:addr waitView:_waitView isEncrypted:TRUE];
-    linphone_address_unref(addr);
+    [self chatEncrypted: TRUE];
 }
 
 - (IBAction)onDeleteClick:(id)sender {
@@ -183,12 +177,27 @@
 - (IBAction)onSMSInviteClick:(id)sender {
     MFMessageComposeViewController *controller = [[MFMessageComposeViewController alloc] init];
     if([MFMessageComposeViewController canSendText]) {
-        controller.body = NSLocalizedString(@"Hello! Join me on Linphone! You can download it for free at: https://www.linphone.org/download",nil);
+        controller.body = NSLocalizedString(@"Hello! Join me on 4Freedom Mobile! You can signup via https://www.4freedommobile.com/",nil);
         controller.recipients = [NSArray arrayWithObjects:[self.addressLabel text], nil];
         
         controller.messageComposeDelegate = PhoneMainView.instance;
         [PhoneMainView.instance presentViewController:controller animated:YES completion:nil];
     }
 }
+
+#pragma mark - 4Freedom Mobile Changes
+- (void) chatEncrypted:(BOOL) _isEncrypted
+{
+    LinphoneAddress *addr = [LinphoneUtils normalizeSipOrPhoneAddress:_addressLabel.text];
+    [LinphoneManager.instance lpConfigSetBool:TRUE forKey:@"create_chat"];
+    
+    // Extract username and domain, build address and then call get or create one to one chat room
+    const char* username = linphone_address_get_username(addr);
+    const char* domain = linphone_address_get_domain(addr);
+    NSString* sipAddr = [NSString stringWithFormat:@"sip:%s@%s", username, domain];
+    [PhoneMainView.instance getOrCreateOneToOneChatRoomFor:sipAddr waitView:_waitView isEncrypted: _isEncrypted];
+    linphone_address_unref(addr);
+}
+
 
 @end

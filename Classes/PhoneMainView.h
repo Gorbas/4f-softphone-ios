@@ -122,6 +122,12 @@
 + (int)iphoneStatusBarHeight;
 -(BOOL) darkMode;
 
+
+#pragma mark - 4Freedom Changes
+- (void)getOrCreateOneToOneChatRoomFor:(const NSString *)remoteAddress waitView:(UIView *)waitView isEncrypted:(BOOL)isEncrypted;
+- (void)createChatRoomFor:(NSArray<NSString *>*) _contacts  waitView:(UIView *)waitView isEncrypted:(BOOL)isEncrypted subject: (NSString *) subject;
+
+
 @end
 
 void main_view_chat_room_state_changed(LinphoneChatRoom *cr, LinphoneChatRoomState newState);

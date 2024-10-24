@@ -1,4 +1,5 @@
 [app]
+auto_download_incoming_files_max_size=0
 animations_preference=1
 autoanswer_notif_preference=1
 backgroundmode_preference=1

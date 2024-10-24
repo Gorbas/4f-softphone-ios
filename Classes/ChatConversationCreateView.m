@@ -199,9 +199,7 @@ static UICompositeViewDescription *compositeDescription = nil;
 
 - (void)createChatRoom {
 	NSString *addr = _tableController.contactsGroup[0];
-	LinphoneAddress *remoteAddress = linphone_address_new(addr.UTF8String);
-	[PhoneMainView.instance getOrCreateOneToOneChatRoom:remoteAddress waitView:_waitView isEncrypted:_isEncrypted];
-	linphone_address_unref(remoteAddress);
+    [PhoneMainView.instance getOrCreateOneToOneChatRoomFor:addr waitView:_waitView isEncrypted:_isEncrypted];
 }
 
 #pragma mark - Buttons signals

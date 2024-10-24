@@ -202,20 +202,7 @@ static UICompositeViewDescription *compositeDescription = nil;
 }
 
 - (void)onCreate {
-	bctbx_list_t *addresses = NULL;
-	for (NSString *addr in _contacts) {
-		LinphoneAddress *linphoneAddress = linphone_address_new(addr.UTF8String);
-		if (!linphoneAddress)
-			continue;
-
-		if (!addresses) {
-			addresses = bctbx_list_new((void *)linphoneAddress);
-			continue;
-		}
-		addresses = bctbx_list_append(addresses, (void *)linphoneAddress);
-	}
-	[PhoneMainView.instance createChatRoom:_nameLabel.text.UTF8String addresses:addresses andWaitView:_waitView isEncrypted:_encrypted isGroup:TRUE];
-	bctbx_list_free_with_data(addresses, (void (*)(void *))linphone_address_unref);
+    [PhoneMainView.instance createChatRoomFor:_contacts waitView:_waitView isEncrypted:_encrypted subject:_nameLabel.text];
 }
 
 - (void)onValidate {

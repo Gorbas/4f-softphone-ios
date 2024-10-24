@@ -289,14 +289,8 @@
 	
 	LinphoneAccount *defaultAccount = linphone_core_get_default_account(LC);
 	if (!(defaultAccount && linphone_account_params_get_conference_factory_uri(linphone_account_get_params(defaultAccount))) || !_isGroupChat) {
-		LinphoneAddress *addr = linphone_address_new(cell.addressLabel.text.UTF8String);
-		[PhoneMainView.instance getOrCreateOneToOneChatRoom:addr waitView:_waitView isEncrypted:_isEncrypted];
-		if (!addr) {
-			LOGE(@"Chat room could not be created on server, because null address.");
-			[ChatConversationInfoView displayCreationError];
-		} else {
-			linphone_address_unref(addr);
-		}
+        NSString* addr = cell.addressLabel.text;
+        [PhoneMainView.instance getOrCreateOneToOneChatRoomFor:addr waitView:_waitView isEncrypted:_isEncrypted];
 		return;
 	}
 

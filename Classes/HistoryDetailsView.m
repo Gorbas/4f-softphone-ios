@@ -230,15 +230,24 @@ static UICompositeViewDescription *compositeDescription = nil;
 }
 
 - (IBAction)onChatClick:(id)event {
-	const LinphoneAddress *addr = linphone_call_log_get_remote_address(callLog);
-	[LinphoneManager.instance lpConfigSetBool:TRUE forKey:@"create_chat"];
-    [PhoneMainView.instance getOrCreateOneToOneChatRoom:addr waitView:_waitView isEncrypted:FALSE];
+    [self chatEncrypted: FALSE];
 }
 
 - (IBAction)onEncryptedChatClick:(id)sender {
+    [self chatEncrypted: TRUE];
+}
+
+#pragma mark - 4Freedom Mobile Changes
+- (void) chatEncrypted:(BOOL) _isEncrypted
+{
     const LinphoneAddress *addr = linphone_call_log_get_remote_address(callLog);
 	[LinphoneManager.instance lpConfigSetBool:TRUE forKey:@"create_chat"];
-    [PhoneMainView.instance getOrCreateOneToOneChatRoom:addr waitView:_waitView isEncrypted:TRUE];
+    
+    // Extract username and domain, build address and then call get or create one to one chat room
+    const char* username = linphone_address_get_username(addr);
+    const char* domain = linphone_address_get_domain(addr);
+    NSString* sipAddr = [NSString stringWithFormat:@"sip:%s@%s", username, domain];
+    [PhoneMainView.instance getOrCreateOneToOneChatRoomFor:sipAddr waitView:_waitView isEncrypted: _isEncrypted];
 }
 
 @end

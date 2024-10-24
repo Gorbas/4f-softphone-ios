@@ -826,7 +826,6 @@ static RootViewManager *rootViewManagerInstance = nil;
 }
 
 #pragma mark - Chat room Functions
-
 - (void)getOrCreateOneToOneChatRoom:(const LinphoneAddress *)remoteAddress waitView:(UIView *)waitView isEncrypted:(BOOL)isEncrypted{
 	if (!remoteAddress) {
 		[self changeCurrentView:ChatsListView.compositeViewDescription];
@@ -997,6 +996,43 @@ void main_view_chat_room_state_changed(LinphoneChatRoom *cr, LinphoneChatRoomSta
 
 -(void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
 	[UIDeviceBridge notifyDisplayModeSwitch];
+}
+
+#pragma mark - 4Freedom Changes
+- (void)getOrCreateOneToOneChatRoomFor:(NSString *)remoteAddress waitView:(UIView *)waitView isEncrypted:(BOOL)isEncrypted{
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        LinphoneAddress *addr = [LinphoneManager linphone_address_new: remoteAddress isForCall: NO];
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            [self getOrCreateOneToOneChatRoom:addr waitView:waitView isEncrypted:isEncrypted];
+            if (!addr) {
+                LOGE(@"Chat room could not be created on server, because null address.");
+                [ChatConversationInfoView displayCreationError];
+            } else {
+                linphone_address_unref(addr);
+            }
+        });
+    });
+}
+
+- (void)createChatRoomFor:(NSArray<NSString *>*) _contacts  waitView:(UIView *)waitView isEncrypted:(BOOL)isEncrypted subject: (NSString *) subject{
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        bctbx_list_t *addresses = NULL;
+        for (NSString *addr in _contacts) {
+            LinphoneAddress *linphoneAddress = [LinphoneManager linphone_address_new:addr isForCall: NO];
+            if (!linphoneAddress)
+                continue;
+            
+            if (!addresses) {
+                addresses = bctbx_list_new((void *)linphoneAddress);
+                continue;
+            }
+            addresses = bctbx_list_append(addresses, (void *)linphoneAddress);
+        }
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            [self createChatRoom: subject.UTF8String addresses:addresses andWaitView:_waitView isEncrypted:isEncrypted isGroup: TRUE];
+        });
+        bctbx_list_free_with_data(addresses, (void (*)(void *))linphone_address_unref);
+    });
 }
 
 @end

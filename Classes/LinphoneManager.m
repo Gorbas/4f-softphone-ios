@@ -1950,8 +1950,19 @@ static int comp_call_state_paused(const LinphoneCall *call, const void *param) {
 	// For OutgoingCall, show CallOutgoingView
 	LinphoneVideoActivationPolicy *policy = linphone_core_get_video_activation_policy(LC);
 	BOOL initiateVideoCall =  linphone_video_activation_policy_get_automatically_initiate(policy);
-	[CallManager.instance startCallWithAddr:iaddr isSas:FALSE isVideo:initiateVideoCall isConference:false];
-	linphone_video_activation_policy_unref(policy);
+
+    
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        // Extract the SIP addr
+        const char* username = linphone_address_get_username(iaddr);
+        const char* domain = linphone_address_get_domain(iaddr);
+        NSString* sipAddr = [NSString stringWithFormat:@"sip:%s@%s", username, domain];
+        LinphoneAddress *addr = [LinphoneManager linphone_address_new:sipAddr isForCall: YES];
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            [CallManager.instance startCallWithAddr:addr isSas:FALSE isVideo:initiateVideoCall isConference:false];
+            linphone_video_activation_policy_unref(policy);
+        });
+    });
 }
 
 #pragma mark - Misc Functions
@@ -2417,7 +2428,7 @@ void linphone_iphone_conference_state_changed(LinphoneCore *lc, LinphoneConferen
 }
 
 
-// 4Freedom Changes | BEGIN
+#pragma mark - 4Freedom Changes
 #define BASE_URL_4FREEDOM "https://siptst.4freedommobile.com/wrapper/"
 
 + (NSDictionary<NSString*, NSString*>*) loginTo4Freedom: (NSString *) phone password: (NSString *) password completion:(void (^)(NSDictionary<NSString *, NSString *> * _Nullable, NSError * _Nullable))completion {
@@ -2466,19 +2477,25 @@ void linphone_iphone_conference_state_changed(LinphoneCore *lc, LinphoneConferen
     return nil;
 }
 
-+ (NSDictionary<NSString *, NSString *> *)getSipAddressForPhoneNumber:(NSString *)phone mode:(NSString *)mode {
++ (NSDictionary<NSString *, NSString *> *_Nullable)getSipAddressForPhoneNumber:(NSString *)phone mode:(NSString *)mode {
+    phone = [phone stringByReplacingOccurrencesOfString:@"sip:" withString:@""];
+    phone = [[phone componentsSeparatedByString:@"@"] firstObject];
+
     NSMutableDictionary *jsonBody = [[NSMutableDictionary alloc] init];
     [jsonBody setObject:[phone stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] forKey:@"phone"];
     [jsonBody setObject:[mode stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] forKey:@"mode"];
 
-    NSData *bodyData = [[jsonBody description] dataUsingEncoding:NSUTF8StringEncoding];
+    NSURLResponse *response;
+    NSError *error;
+    NSData *bodyData = [NSJSONSerialization dataWithJSONObject:jsonBody options:0 error:&error];
+    
     NSURL *url = [NSURL URLWithString:[NSString stringWithFormat:@"%sapi/getSipAddressForPhoneNumber/", BASE_URL_4FREEDOM]];
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
     [request setHTTPMethod:@"POST"];
     [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+    [request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
     [request setHTTPBody:bodyData];
-    NSError *error;
-    NSURLResponse *response;
+
     NSData *responseData = [NSURLConnection sendSynchronousRequest:request returningResponse:&response error:&error];
     if (!error) {
         NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
@@ -2507,7 +2524,25 @@ void linphone_iphone_conference_state_changed(LinphoneCore *lc, LinphoneConferen
 
     return nil;
 }
-// 4Freedom Changes | END
+
++ (LinphoneAddress *_Nonnull) linphone_address_new: (NSString *_Nonnull) addressStr isForCall: (BOOL) isForCall {
+    NSString *normalRemoteAddress = [[[[addressStr stringByReplacingOccurrencesOfString:@" " withString:@""] stringByReplacingOccurrencesOfString:@"-" withString:@""] stringByReplacingOccurrencesOfString:@"(" withString:@""] stringByReplacingOccurrencesOfString:@")" withString:@""];
+    
+    // TODO: Introduce a display name that will retrieve it from the address book
+    
+    NSDictionary* sipAddressDetails = [self getSipAddressForPhoneNumber:normalRemoteAddress mode:isForCall? @"call": @"message"];
+    NSString* _address = [NSString stringWithFormat:@"sip:%@",sipAddressDetails[@"sip_address"]];
+    NSString* display_name = sipAddressDetails[@"display_name"];
+    if (display_name == nil) {
+        display_name = sipAddressDetails[@"username"];
+    }
+    if (display_name == nil) {
+        display_name = @"";
+    }
+    LinphoneAddress *address =  linphone_address_new(_address.UTF8String);
+    linphone_address_set_display_name(address, display_name.UTF8String);
+    return address;
+}
 
 
 @end
